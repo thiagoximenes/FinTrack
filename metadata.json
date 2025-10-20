@@ -1,0 +1,5 @@
+{
+  "name": "FinTrack",
+  "description": "A modern personal finance dashboard with user authentication and financial tracking features.",
+  "requestFramePermissions": []
+}
