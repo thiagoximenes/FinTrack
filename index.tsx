@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import { GoogleGenAI } from "@google/genai";
 
 // --- Types ---
 type TransactionType = 'revenue' | 'expense';
@@ -102,13 +103,13 @@ const LandingPage = ({ onNavigate }: { onNavigate: (page: string) => void }) => 
                 <section id="features" className="lp-section">
                     <h2>Como Funciona</h2>
                     <div className="features-grid">
-                        <FeatureCard icon="1" title="Cadastre-se Rapidamente">
+                        <FeatureCard icon="🚀" title="Cadastre-se Rapidamente">
                             Crie sua conta em menos de um minuto e comece a organizar suas finanças.
                         </FeatureCard>
-                        <FeatureCard icon="2" title="Registre Transações">
+                        <FeatureCard icon="💸" title="Registre Transações">
                             Adicione suas receitas e despesas de forma intuitiva, categorizando cada uma.
                         </FeatureCard>
-                        <FeatureCard icon="3" title="Visualize Seus Dados">
+                        <FeatureCard icon="📊" title="Visualize Seus Dados">
                             Acompanhe seu progresso com gráficos e relatórios claros e objetivos.
                         </FeatureCard>
                     </div>
@@ -144,7 +145,6 @@ const AuthForm = ({ type, onNavigate }: { type: 'login' | 'signup' | 'forgot', o
         e.preventDefault();
         setMessage('');
 
-        // Mock login for testing
         if (type === 'login' && email === 'admin@admin.com' && password === '123123') {
              setMessage('Login bem-sucedido! Redirecionando...');
              setTimeout(() => onNavigate('dashboard'), 1000);
@@ -295,6 +295,70 @@ const AddTransactionModal = ({
     );
 };
 
+const SimpleMarkdownRenderer = ({ text }: { text: string }) => {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    return (
+        <div className="analysis-modal-content">
+            {lines.map((line, index) => {
+                if (line.startsWith('### ')) {
+                    return <h3 key={index}>{line.substring(4)}</h3>;
+                }
+                if (line.startsWith('## ')) {
+                    return <h2 key={index}>{line.substring(3)}</h2>;
+                }
+                if (line.startsWith('# ')) {
+                    return <h2 key={index}>{line.substring(2)}</h2>;
+                }
+                if (line.startsWith('* ')) {
+                    const boldedLine = line.substring(2).split('**').map((part, i) => 
+                        i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+                    );
+                    return <li key={index} style={{ marginLeft: '20px' }}>{boldedLine}</li>;
+                }
+                const parts = line.split('**');
+                return (
+                    <p key={index}>
+                        {parts.map((part, i) =>
+                            i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+                        )}
+                    </p>
+                );
+            })}
+        </div>
+    );
+};
+
+
+const FinancialAnalysisModal = ({ isOpen, onClose, isLoading, analysisText }: {
+    isOpen: boolean,
+    onClose: () => void,
+    isLoading: boolean,
+    analysisText: string | null
+}) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                {isLoading ? (
+                    <div className="loading-container">
+                        <div className="spinner"></div>
+                        <p>Analisando suas finanças... O Gemini está pensando.</p>
+                    </div>
+                ) : (
+                    <>
+                        <h2>Análise Financeira com IA</h2>
+                        {analysisText ? <SimpleMarkdownRenderer text={analysisText} /> : <p>Não foi possível gerar a análise.</p>}
+                        <div className="modal-actions">
+                            <button className="btn btn-primary" onClick={onClose}>Fechar</button>
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const CategoryChart = ({ data, onCategoryClick }: { data: Transaction[], onCategoryClick: (category: string) => void }) => {
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<any>(null);
@@ -312,7 +376,7 @@ const CategoryChart = ({ data, onCategoryClick }: { data: Transaction[], onCateg
         const labels = Object.keys(spendingByCategory);
         const chartData = Object.values(spendingByCategory);
 
-        const colors = ['#4A90E2', '#50E3C2', '#E84A5F', '#F5A623', '#BD10E0', '#B8E986', '#7B68EE'];
+        const colors = ['#5A67D8', '#38A169', '#E53E3E', '#ED8936', '#805AD5', '#319795', '#D53F8C'];
         
         if (chartInstanceRef.current) {
             chartInstanceRef.current.destroy();
@@ -329,7 +393,7 @@ const CategoryChart = ({ data, onCategoryClick }: { data: Transaction[], onCateg
                     data: chartData,
                     backgroundColor: labels.map((_, i) => colors[i % colors.length]),
                     borderColor: 'var(--surface-color)',
-                    borderWidth: 3,
+                    borderWidth: 4,
                 }]
             },
             options: {
@@ -423,7 +487,7 @@ const AnnualTrendChart = ({ transactions }: { transactions: Transaction[] }) => 
                         label: 'Receitas',
                         data: revenueData,
                         borderColor: 'var(--green)',
-                        backgroundColor: 'rgba(80, 227, 194, 0.2)',
+                        backgroundColor: 'rgba(56, 161, 105, 0.2)',
                         fill: true,
                         tension: 0.4,
                     },
@@ -431,7 +495,7 @@ const AnnualTrendChart = ({ transactions }: { transactions: Transaction[] }) => 
                         label: 'Despesas',
                         data: expenseData,
                         borderColor: 'var(--red)',
-                        backgroundColor: 'rgba(232, 74, 95, 0.2)',
+                        backgroundColor: 'rgba(229, 62, 62, 0.2)',
                         fill: true,
                         tension: 0.4,
                     }
@@ -444,7 +508,7 @@ const AnnualTrendChart = ({ transactions }: { transactions: Transaction[] }) => 
                     y: {
                         beginAtZero: true,
                         ticks: { color: 'var(--text-muted)' },
-                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        grid: { color: 'var(--border-color)' }
                     },
                     x: {
                         ticks: { color: 'var(--text-muted)' },
@@ -518,7 +582,7 @@ const MonthlyTrendChart = ({ transactions, selectedDate }: { transactions: Trans
                         label: 'Receitas',
                         data: revenueData,
                         borderColor: 'var(--green)',
-                        backgroundColor: 'rgba(80, 227, 194, 0.2)',
+                        backgroundColor: 'rgba(56, 161, 105, 0.2)',
                         fill: true,
                         tension: 0.4,
                     },
@@ -526,7 +590,7 @@ const MonthlyTrendChart = ({ transactions, selectedDate }: { transactions: Trans
                         label: 'Despesas',
                         data: expenseData,
                         borderColor: 'var(--red)',
-                        backgroundColor: 'rgba(232, 74, 95, 0.2)',
+                        backgroundColor: 'rgba(229, 62, 62, 0.2)',
                         fill: true,
                         tension: 0.4,
                     }
@@ -536,7 +600,7 @@ const MonthlyTrendChart = ({ transactions, selectedDate }: { transactions: Trans
                 responsive: true,
                 maintainAspectRatio: false,
                  scales: {
-                    y: { beginAtZero: true, ticks: { color: 'var(--text-muted)' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+                    y: { beginAtZero: true, ticks: { color: 'var(--text-muted)' }, grid: { color: 'var(--border-color)' } },
                     x: { ticks: { color: 'var(--text-muted)' }, grid: { display: false } }
                 },
                 plugins: {
@@ -613,7 +677,7 @@ const TransactionListView = ({
         <div className={`card ${isFullList ? 'card-full-width' : ''}`}>
             <h3>{title}</h3>
             {currentTransactions.length > 0 ? (
-                <ul className={`transaction-list ${isFullList ? 'full-list' : ''}`}>
+                <ul className="transaction-list">
                     {currentTransactions.map(t => (
                         <li key={t.id} className={t.type}>
                             <div>
@@ -623,8 +687,8 @@ const TransactionListView = ({
                             </div>
                             <div className="transaction-actions">
                                 <span className="transaction-amount">{formatCurrency(t.amount)}</span>
-                                <button className="btn-edit" onClick={() => onEdit(t)}>Editar</button>
-                                <button className="btn-delete" onClick={() => onDelete(t.id)}>Excluir</button>
+                                <button className="btn-icon" title="Editar" onClick={() => onEdit(t)}>✏️</button>
+                                <button className="btn-icon btn-delete" title="Excluir" onClick={() => onDelete(t.id)}>🗑️</button>
                             </div>
                         </li>
                     ))}
@@ -632,11 +696,11 @@ const TransactionListView = ({
             ) : <p>Nenhuma transação encontrada.</p>}
             {isFullList && totalPages > 1 && (
                  <div className="pagination">
-                    <button className="btn btn-secondary" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}>
+                    <button className="btn btn-secondary" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
                         Anterior
                     </button>
                     <span>Página {currentPage} de {totalPages}</span>
-                     <button className="btn btn-secondary" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages}>
+                     <button className="btn btn-secondary" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
                         Próximo
                     </button>
                 </div>
@@ -684,10 +748,12 @@ const DashboardHeader = ({
     title,
     selectedDate,
     onDateChange,
+    onAnalyse,
 }: {
     title: string;
     selectedDate: { month: number; year: number };
     onDateChange: (type: 'month' | 'year', value: number) => void;
+    onAnalyse: () => void;
 }) => {
     const [time, setTime] = useState(new Date());
 
@@ -717,6 +783,7 @@ const DashboardHeader = ({
                 </div>
             </div>
             <div className="header-right">
+                <button className="btn btn-secondary" onClick={onAnalyse}>Análise com IA ✨</button>
             </div>
         </header>
     );
@@ -781,7 +848,7 @@ const DashboardOverview = ({
     return (
         <div className="dashboard-grid">
             <div className="card summary-card balance">
-                <h3>Saldo Atual</h3>
+                <h3>Saldo Mensal</h3>
                 <p>{formatCurrency(balance)}</p>
             </div>
             <div className="card summary-card revenue">
@@ -847,6 +914,47 @@ const DashboardPage = ({ onLogout, theme, toggleTheme }: { onLogout: () => void,
     });
     const [filteredCategory, setFilteredCategory] = useState<string | null>(null);
 
+    const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
+    const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+    const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
+
+    const filteredTransactions = transactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return transactionDate.getMonth() + 1 === selectedDate.month &&
+               transactionDate.getFullYear() === selectedDate.year;
+    });
+
+    const handleAnalyseFinances = async () => {
+        setIsAnalysisModalOpen(true);
+        setIsAnalysisLoading(true);
+        setAnalysisResult(null);
+
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+            const prompt = `
+                Você é um analista financeiro especialista. Analise a seguinte lista de transações (em formato JSON) para o mês selecionado.
+                Forneça um resumo dos hábitos de consumo, identifique as 3 principais categorias de despesas, sugira 2 áreas onde o usuário pode economizar e dê um conselho geral para melhorar a saúde financeira.
+                Formate sua resposta em Markdown. Use títulos (##), listas (*), e texto em negrito (**) para uma boa apresentação.
+                
+                Aqui estão as transações:
+                ${JSON.stringify(filteredTransactions, null, 2)}
+            `;
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-pro',
+                contents: prompt,
+                config: {
+                  thinkingConfig: { thinkingBudget: 32768 }
+                }
+            });
+            setAnalysisResult(response.text);
+        } catch (error) {
+            console.error("Error generating financial analysis:", error);
+            setAnalysisResult("Ocorreu um erro ao gerar a análise. Tente novamente mais tarde.");
+        } finally {
+            setIsAnalysisLoading(false);
+        }
+    };
+
     const handleDateChange = (type: 'month' | 'year', value: number) => {
         setSelectedDate(prev => ({ ...prev, [type]: value }));
         setFilteredCategory(null);
@@ -881,12 +989,6 @@ const DashboardPage = ({ onLogout, theme, toggleTheme }: { onLogout: () => void,
         setEditingTransaction(null);
         setIsModalOpen(true);
     };
-
-    const filteredTransactions = transactions.filter(t => {
-        const transactionDate = new Date(t.date);
-        return transactionDate.getMonth() + 1 === selectedDate.month &&
-               transactionDate.getFullYear() === selectedDate.year;
-    });
 
     const getHeaderTitle = () => {
         if (filteredCategory) return "Detalhes da Categoria";
@@ -933,7 +1035,7 @@ const DashboardPage = ({ onLogout, theme, toggleTheme }: { onLogout: () => void,
         <div className="dashboard-layout">
             <Sidebar activeView={view} onNavigate={setView} onLogout={onLogout} theme={theme} toggleTheme={toggleTheme} />
             <main className="dashboard-main">
-                <DashboardHeader title={getHeaderTitle()} selectedDate={selectedDate} onDateChange={handleDateChange} />
+                <DashboardHeader title={getHeaderTitle()} selectedDate={selectedDate} onDateChange={handleDateChange} onAnalyse={handleAnalyseFinances} />
                 <button className="btn btn-primary" style={{alignSelf: 'flex-start', marginBottom: '2rem'}} onClick={openAddModal}>
                     Adicionar Transação
                 </button>
@@ -946,6 +1048,12 @@ const DashboardPage = ({ onLogout, theme, toggleTheme }: { onLogout: () => void,
                 onUpdateTransaction={handleUpdateTransaction}
                 categories={categories}
                 editingTransaction={editingTransaction}
+            />
+            <FinancialAnalysisModal
+                isOpen={isAnalysisModalOpen}
+                onClose={() => setIsAnalysisModalOpen(false)}
+                isLoading={isAnalysisLoading}
+                analysisText={analysisResult}
             />
         </div>
     );
