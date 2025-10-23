@@ -1,310 +1,264 @@
-// @ts-nocheck
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 
-// --- TIPOS E INTERFACES ---
+// --- Types ---
+type TransactionType = 'revenue' | 'expense';
+
 interface Transaction {
-  id: number;
-  description: string;
-  amount: number;
-  type: 'revenue' | 'expense';
-  category: string;
-  date: string; // Formato YYYY-MM-DD
+    id: string;
+    description: string;
+    amount: number;
+    category: string;
+    date: string; // YYYY-MM-DD
+    type: TransactionType;
 }
 
 interface Category {
-  id: number;
-  name: string;
+    id: string;
+    name: string;
 }
 
-// --- DADOS MOCKADOS ---
-const initialCategories: Category[] = [
-  { id: 1, name: 'Salário' },
-  { id: 2, name: 'Alimentação' },
-  { id: 3, name: 'Transporte' },
-  { id: 4, name: 'Moradia' },
-  { id: 5, name: 'Lazer' },
-  { id: 6, name: 'Saúde' },
+// --- Mock Data ---
+const initialTransactions: Transaction[] = [
+    // Previous months data
+    { id: 't1', description: 'Salário', amount: 5000, category: 'Salário', date: '2024-05-15', type: 'revenue' },
+    { id: 't2', description: 'Aluguel', amount: 1500, category: 'Moradia', date: '2024-05-05', type: 'expense' },
+    { id: 't3', description: 'Supermercado', amount: 400, category: 'Alimentação', date: '2024-05-10', type: 'expense' },
+    { id: 't4', description: 'Freelance', amount: 750, category: 'Extra', date: '2024-05-20', type: 'revenue' },
+    { id: 't5', description: 'Conta de Luz', amount: 150, category: 'Contas', date: '2024-05-22', type: 'expense' },
+
+    // Current month data
+    { id: 't6', description: 'Salário', amount: 5000, category: 'Salário', date: new Date().toISOString().slice(0, 8) + '15', type: 'revenue' },
+    { id: 't7', description: 'Aluguel', amount: 1500, category: 'Moradia', date: new Date().toISOString().slice(0, 8) + '05', type: 'expense' },
+    { id: 't8', description: 'Supermercado', amount: 600, category: 'Alimentação', date: new Date().toISOString().slice(0, 8) + '10', type: 'expense' },
+    { id: 't9', description: 'Cinema', amount: 80, category: 'Lazer', date: new Date().toISOString().slice(0, 8) + '18', type: 'expense' },
+    { id: 't10', description: 'Venda de item usado', amount: 200, category: 'Extra', date: new Date().toISOString().slice(0, 8) + '20', type: 'revenue' },
+    { id: 't11', description: 'Internet', amount: 100, category: 'Contas', date: new Date().toISOString().slice(0, 8) + '12', type: 'expense' },
+    
+    // Future months data (for testing filters)
+    { id: 't12', description: 'Salário', amount: 5000, category: 'Salário', date: '2024-07-15', type: 'revenue' },
+    
+    // More data for pagination and charts
+    ...Array.from({ length: 15 }, (_, i) => ({
+        id: `p${i}`,
+        description: `Compra Aleatória ${i + 1}`,
+        amount: Math.random() * 200 + 10,
+        category: ['Alimentação', 'Lazer', 'Transporte'][i % 3],
+        date: new Date().toISOString().slice(0, 8) + (Math.floor(Math.random() * 28) + 1).toString().padStart(2, '0'),
+        type: 'expense' as TransactionType,
+    })),
 ];
 
-const generateInitialTransactions = (): Transaction[] => {
-    const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
-    const transactions = [];
-    for (let i = 1; i <= 25; i++) {
-        transactions.push({ id: i, description: `Compra Supermercado ${i}`, amount: 50 + i, type: 'expense', category: 'Alimentação', date: new Date(currentYear, currentMonth, Math.min(i, 28)).toISOString().split('T')[0] });
-    }
-    transactions.push({ id: 26, description: 'Salário Mensal', amount: 5000, type: 'revenue', category: 'Salário', date: new Date(currentYear, currentMonth, 5).toISOString().split('T')[0] });
-    transactions.push({ id: 27, description: 'Aluguel', amount: 1500, type: 'expense', category: 'Moradia', date: new Date(currentYear, currentMonth, 10).toISOString().split('T')[0] });
-     // Dados para meses anteriores
-    transactions.push({ id: 28, description: 'Salário Mensal', amount: 5000, type: 'revenue', category: 'Salário', date: new Date(currentYear, currentMonth - 1, 5).toISOString().split('T')[0] });
-    transactions.push({ id: 29, description: 'Aluguel', amount: 1500, type: 'expense', category: 'Moradia', date: new Date(currentYear, currentMonth - 1, 10).toISOString().split('T')[0] });
-    transactions.push({ id: 30, description: 'Supermercado', amount: 450, type: 'expense', category: 'Alimentação', date: new Date(currentYear, currentMonth - 2, 12).toISOString().split('T')[0] });
-     // Dados para o ano anterior
-    transactions.push({ id: 31, description: 'Salário Mensal', amount: 4800, type: 'revenue', category: 'Salário', date: new Date(currentYear - 1, currentMonth, 5).toISOString().split('T')[0] });
-    transactions.push({ id: 32, description: 'Aluguel', amount: 1450, type: 'expense', category: 'Moradia', date: new Date(currentYear - 1, currentMonth, 10).toISOString().split('T')[0] });
-    
-    return transactions;
+const initialCategories: Category[] = [
+    { id: 'c1', name: 'Salário' },
+    { id: 'c2', name: 'Moradia' },
+    { id: 'c3', name: 'Alimentação' },
+    { id: 'c4', name: 'Contas' },
+    { id: 'c5', name: 'Lazer' },
+    { id: 'c6', name: 'Transporte' },
+    { id: 'c7', name: 'Extra' },
+];
+
+// --- Helper Functions ---
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount);
+};
+const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() + userTimezoneOffset).toLocaleDateString('pt-BR');
 };
 
 
-// --- HELPERS ---
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
-};
-
-// --- COMPONENTES DE UI ---
-const FeatureCard: React.FC<{ icon: string; title: string; children?: React.ReactNode }> = ({ icon, title, children }) => (
-  <div className="feature-card">
-    <div className="feature-icon">{icon}</div>
-    <h3>{title}</h3>
-    <p>{children}</p>
-  </div>
-);
-
-const TestimonialCard: React.FC<{ author: string; children?: React.ReactNode }> = ({ author, children }) => (
-  <div className="testimonial-card">
-    <p>"{children}"</p>
-    <span>- {author}</span>
-  </div>
-);
-
-// --- PÁGINAS ---
-const LandingPage = ({ onNavigate }) => (
-  <div className="lp-container">
-    <header className="lp-header">
-      <h1 className="logo">FinTrack</h1>
-      <nav>
-        <button onClick={() => onNavigate('login')} className="btn btn-secondary">Login</button>
-      </nav>
-    </header>
-    <main className="lp-main">
-      <div className="hero">
-        <h2>Controle suas finanças com inteligência e simplicidade.</h2>
-        <p>A plataforma definitiva para organizar suas receitas, despesas e alcançar seus objetivos financeiros.</p>
-        <button onClick={() => onNavigate('signup')} className="btn btn-primary btn-lg">Comece Agora</button>
-      </div>
-    </main>
-
-    <section id="features" className="lp-section">
-      <h2>Como Funciona</h2>
-      <div className="features-grid">
-        <FeatureCard icon="1" title="Cadastre-se">
-          Crie sua conta de forma rápida e segura para começar a organizar suas finanças.
-        </FeatureCard>
-        <FeatureCard icon="2" title="Registre Transações">
-          Adicione suas receitas e despesas diárias com facilidade, usando categorias personalizadas.
-        </FeatureCard>
-        <FeatureCard icon="3" title="Visualize e Decida">
-          Acompanhe seus gastos com gráficos intuitivos e tome decisões mais inteligentes.
-        </FeatureCard>
-      </div>
-    </section>
-
-    <section id="testimonials" className="lp-section">
-        <h2>O que dizem nossos usuários</h2>
-        <div className="testimonials-grid">
-            <TestimonialCard author="Ana Silva">
-                O FinTrack transformou a maneira como eu lido com meu dinheiro. Finalmente tenho clareza sobre meus gastos!
-            </TestimonialCard>
-            <TestimonialCard author="Carlos Souza">
-                A interface é limpa e muito fácil de usar. O cadastro de despesas é super rápido. Recomendo!
-            </TestimonialCard>
-        </div>
-    </section>
-
-    <footer className="lp-footer">
-        <p>&copy; {new Date().getFullYear()} FinTrack. Todos os direitos reservados.</p>
-    </footer>
-  </div>
-);
-
-const AuthForm: React.FC<{ mode: 'login' | 'signup' | 'forgot'; onNavigate: (page: string) => void; onAuthSuccess: () => void; children?: React.ReactNode }> = ({ mode, onNavigate, onAuthSuccess }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('');
-
-  const title = {
-    login: 'Acesse sua conta',
-    signup: 'Crie sua conta',
-    forgot: 'Recuperar Senha',
-  };
-
-  const buttonText = {
-    login: 'Entrar',
-    signup: 'Registrar',
-    forgot: 'Enviar Link',
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (email === 'admin@admin.com' && password === '123123') {
-        onAuthSuccess();
-        return;
-    }
-    // Lógica simulada
-    if (mode === 'login') {
-      setMessage('Login inválido (use admin@admin.com)');
-    } else if (mode === 'signup') {
-      setMessage('Registro efetuado com sucesso! Agora você pode fazer o login.');
-      setTimeout(() => onNavigate('login'), 2000);
-    } else {
-      setMessage('Se o e-mail estiver correto, um link de recuperação foi enviado.');
-    }
-  };
-
-  return (
-    <div className="auth-container">
-      <div className="auth-form-wrapper">
-        <h1 className="logo auth-logo" onClick={() => onNavigate('landing')}>FinTrack</h1>
-        <h2>{title[mode]}</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </div>
-          {mode !== 'forgot' && (
-            <div className="form-group">
-              <label htmlFor="password">Senha</label>
-              <input type="password" id="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            </div>
-          )}
-          <button type="submit" className="btn btn-primary auth-btn">{buttonText[mode]}</button>
-        </form>
-        {message && <p className="auth-message">{message}</p>}
-        <div className="auth-links">
-          {mode === 'login' && <a onClick={() => onNavigate('signup')}>Não tem uma conta? Registre-se</a>}
-          {mode === 'login' && <a onClick={() => onNavigate('forgot')}>Esqueceu a senha?</a>}
-          {mode !== 'login' && <a onClick={() => onNavigate('login')}>Já tem uma conta? Faça login</a>}
-        </div>
-      </div>
+// --- Components ---
+const FeatureCard = ({ icon, title, children }: { icon: string, title: string, children?: React.ReactNode }) => (
+    <div className="feature-card">
+        <div className="feature-icon">{icon}</div>
+        <h3>{title}</h3>
+        <p>{children}</p>
     </div>
-  );
-};
-
-// --- COMPONENTES DO DASHBOARD ---
-
-const Sidebar = ({ currentView, onNavigate, onLogout }) => (
-    <aside className="sidebar">
-        <h1 className="logo" onClick={() => onNavigate('dashboard')}>FinTrack</h1>
-        <nav className="sidebar-nav">
-            <a className={currentView === 'dashboard' ? 'active' : ''} onClick={() => onNavigate('dashboard')}>Dashboard</a>
-            <a className={currentView === 'revenues' ? 'active' : ''} onClick={() => onNavigate('revenues')}>Receitas</a>
-            <a className={currentView === 'expenses' ? 'active' : ''} onClick={() => onNavigate('expenses')}>Despesas</a>
-            <a className={currentView === 'categories' ? 'active' : ''} onClick={() => onNavigate('categories')}>Categorias</a>
-            <a className={currentView === 'profile' ? 'active' : ''} onClick={() => onNavigate('profile')}>Meu Perfil</a>
-        </nav>
-        <button className="btn btn-secondary logout-btn" onClick={onLogout}>Sair</button>
-    </aside>
 );
 
-const DashboardHeader = ({ title, selectedDate, onDateChange, onOpenModal }) => {
-    const [time, setTime] = useState(new Date());
+const TestimonialCard = ({ author, children }: { author: string, children?: React.ReactNode }) => (
+    <div className="testimonial-card">
+        <p>"{children}"</p>
+        <span>- {author}</span>
+    </div>
+);
 
-    useEffect(() => {
-        const timerId = setInterval(() => setTime(new Date()), 1000);
-        return () => clearInterval(timerId);
-    }, []);
-    
-    const handleMonthChange = (e) => {
-        onDateChange({ ...selectedDate, month: parseInt(e.target.value) });
-    };
-
-    const handleYearChange = (e) => {
-        onDateChange({ ...selectedDate, year: parseInt(e.target.value) });
-    };
-    
-    const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
-    const months = [
-        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-    ];
-
+const LandingPage = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     return (
-        <header className="dashboard-header">
-            <div className="header-left">
-                <span className="real-time-clock">{time.toLocaleTimeString('pt-BR')}</span>
-            </div>
-            <div className="header-center">
-                 <h2>{title}</h2>
-                 <div className="date-filters">
-                    <select value={selectedDate.month} onChange={handleMonthChange}>
-                        {months.map((month, index) => (
-                            <option key={index} value={index}>{month}</option>
-                        ))}
-                    </select>
-                    <select value={selectedDate.year} onChange={handleYearChange}>
-                        {years.map(year => (
-                            <option key={year} value={year}>{year}</option>
-                        ))}
-                    </select>
-                 </div>
-            </div>
-            <div className="header-right">
-                <button className="btn btn-primary" onClick={onOpenModal}>+ Adicionar Transação</button>
-            </div>
-        </header>
+        <div className="lp-container">
+            <header className="lp-header">
+                <div className="logo" onClick={() => onNavigate('landing')}>FinTrack</div>
+                <button className="btn btn-secondary" onClick={() => onNavigate('login')}>Entrar</button>
+            </header>
+            <main className="lp-main">
+                <section className="hero">
+                    <h2>Controle suas finanças com simplicidade e poder.</h2>
+                    <p>FinTrack é a sua nova ferramenta para uma vida financeira organizada e sem estresse.</p>
+                    <button className="btn btn-primary btn-lg" onClick={() => onNavigate('signup')}>Comece Agora, é Grátis</button>
+                </section>
+                <section id="features" className="lp-section">
+                    <h2>Como Funciona</h2>
+                    <div className="features-grid">
+                        <FeatureCard icon="1" title="Cadastre-se Rapidamente">
+                            Crie sua conta em menos de um minuto e comece a organizar suas finanças.
+                        </FeatureCard>
+                        <FeatureCard icon="2" title="Registre Transações">
+                            Adicione suas receitas e despesas de forma intuitiva, categorizando cada uma.
+                        </FeatureCard>
+                        <FeatureCard icon="3" title="Visualize Seus Dados">
+                            Acompanhe seu progresso com gráficos e relatórios claros e objetivos.
+                        </FeatureCard>
+                    </div>
+                </section>
+                 <section id="testimonials" className="lp-section">
+                    <h2>O que dizem nossos usuários</h2>
+                    <div className="testimonials-grid">
+                        <TestimonialCard author="Ana Paula">
+                            Finalmente uma ferramenta que me ajuda a entender para onde meu dinheiro vai. Simples e eficaz!
+                        </TestimonialCard>
+                        <TestimonialCard author="Carlos Silva">
+                           O FinTrack mudou minha relação com o dinheiro. Os gráficos são incríveis para visualizar meus gastos.
+                        </TestimonialCard>
+                        <TestimonialCard author="Mariana Costa">
+                            Uso todos os dias para registrar minhas vendas como autônoma. Essencial para meu negócio!
+                        </TestimonialCard>
+                    </div>
+                </section>
+            </main>
+            <footer className="lp-footer">
+                <p>&copy; 2024 FinTrack. Todos os direitos reservados.</p>
+            </footer>
+        </div>
     );
 };
 
-const AddTransactionModal = ({ isOpen, onClose, onAddTransaction, onUpdateTransaction, editingTransaction, categories }) => {
+const AuthForm = ({ type, onNavigate }: { type: 'login' | 'signup' | 'forgot', onNavigate: (page: string) => void }) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [message, setMessage] = useState('');
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setMessage('');
+
+        // Mock login for testing
+        if (type === 'login' && email === 'admin@admin.com' && password === '123123') {
+             setMessage('Login bem-sucedido! Redirecionando...');
+             setTimeout(() => onNavigate('dashboard'), 1000);
+             return;
+        }
+
+        if (type === 'forgot') {
+            setMessage('Se uma conta com este e-mail existir, um link de recuperação foi enviado.');
+            return;
+        }
+        
+        setMessage(`${type === 'login' ? 'Login' : 'Cadastro'} bem-sucedido! Redirecionando...`);
+        setTimeout(() => onNavigate(type === 'login' ? 'dashboard' : 'login'), 1500);
+    };
+
+    const title = type === 'login' ? 'Acessar sua conta' : type === 'signup' ? 'Criar nova conta' : 'Recuperar Senha';
+
+    return (
+        <div className="auth-container">
+            <div className="auth-form-wrapper">
+                <div className="auth-logo logo" onClick={() => onNavigate('landing')}>FinTrack</div>
+                <h2>{title}</h2>
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group">
+                        <label htmlFor="email">Email</label>
+                        <input type="email" id="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                    </div>
+                    {type !== 'forgot' && (
+                        <div className="form-group">
+                            <label htmlFor="password">Senha</label>
+                            <input type="password" id="password" value={password} onChange={e => setPassword(e.target.value)} required />
+                        </div>
+                    )}
+                    {message && <p className="auth-message">{message}</p>}
+                    <button type="submit" className="btn btn-primary auth-btn">
+                        {type === 'login' ? 'Entrar' : type === 'signup' ? 'Cadastrar' : 'Enviar Link'}
+                    </button>
+                </form>
+                <div className="auth-links">
+                    {type === 'login' && <a onClick={() => onNavigate('signup')}>Não tem uma conta? Cadastre-se</a>}
+                    {type === 'signup' && <a onClick={() => onNavigate('login')}>Já tem uma conta? Entre</a>}
+                    {type !== 'forgot' && <a onClick={() => onNavigate('forgot')}>Esqueceu sua senha?</a>}
+                    {type === 'forgot' && <a onClick={() => onNavigate('login')}>Voltar para o Login</a>}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const AddTransactionModal = ({
+    isOpen,
+    onClose,
+    onAddTransaction,
+    onUpdateTransaction,
+    categories,
+    editingTransaction,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onAddTransaction: (transaction: Omit<Transaction, 'id'>) => void;
+    onUpdateTransaction: (transaction: Transaction) => void;
+    categories: Category[];
+    editingTransaction: Transaction | null;
+}) => {
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
-    const [type, setType] = useState('expense');
     const [category, setCategory] = useState('');
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-    
-    const isEditMode = !!editingTransaction;
+    const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+    const [type, setType] = useState<TransactionType>('expense');
 
     useEffect(() => {
-        if (isOpen) {
-            if (isEditMode) {
-                setDescription(editingTransaction.description);
-                setAmount(String(editingTransaction.amount));
-                setType(editingTransaction.type);
-                setCategory(editingTransaction.category);
-                setDate(editingTransaction.date);
-            } else {
-                // Reset form for "add" mode
-                setDescription('');
-                setAmount('');
-                setType('expense');
-                setCategory(categories[0]?.name || '');
-                setDate(new Date().toISOString().split('T')[0]);
-            }
+        if (editingTransaction) {
+            setDescription(editingTransaction.description);
+            setAmount(String(editingTransaction.amount));
+            setCategory(editingTransaction.category);
+            setDate(editingTransaction.date);
+            setType(editingTransaction.type);
+        } else {
+            resetForm();
         }
-    }, [isOpen, editingTransaction, categories]);
+    }, [editingTransaction, isOpen]);
+    
+    const resetForm = () => {
+        setDescription('');
+        setAmount('');
+        setCategory(categories.length > 0 ? categories[0].name : '');
+        setDate(new Date().toISOString().slice(0, 10));
+        setType('expense');
+    };
 
-
-    if (!isOpen) return null;
-
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const transactionData = {
             description,
             amount: parseFloat(amount),
-            type,
             category,
             date,
+            type,
         };
-        
-        if (isEditMode) {
+
+        if (editingTransaction) {
             onUpdateTransaction({ ...transactionData, id: editingTransaction.id });
         } else {
             onAddTransaction(transactionData);
         }
-        
         onClose();
     };
-    
+
+    if (!isOpen) return null;
+
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" onClick={e => e.stopPropagation()}>
-                <h3>{isEditMode ? 'Editar Transação' : 'Adicionar Nova Transação'}</h3>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <h2>{editingTransaction ? 'Editar Transação' : 'Adicionar Transação'}</h2>
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
                         <label>Descrição</label>
@@ -315,25 +269,25 @@ const AddTransactionModal = ({ isOpen, onClose, onAddTransaction, onUpdateTransa
                         <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} required />
                     </div>
                     <div className="form-group">
+                        <label>Categoria</label>
+                        <select value={category} onChange={e => setCategory(e.target.value)} required>
+                           {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="form-group">
                         <label>Data</label>
                         <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
                     </div>
                     <div className="form-group">
-                        <label>Tipo</label>
-                        <select value={type} onChange={e => setType(e.target.value)}>
-                            <option value="expense">Despesa</option>
-                            <option value="revenue">Receita</option>
-                        </select>
-                    </div>
-                    <div className="form-group">
-                        <label>Categoria</label>
-                        <select value={category} onChange={e => setCategory(e.target.value)} required>
-                            {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
-                        </select>
+                         <label>Tipo</label>
+                         <select value={type} onChange={e => setType(e.target.value as TransactionType)}>
+                             <option value="expense">Despesa</option>
+                             <option value="revenue">Receita</option>
+                         </select>
                     </div>
                     <div className="modal-actions">
                         <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-                        <button type="submit" className="btn btn-primary">{isEditMode ? 'Salvar Alterações' : 'Adicionar'}</button>
+                        <button type="submit" className="btn btn-primary">{editingTransaction ? 'Salvar Alterações' : 'Adicionar'}</button>
                     </div>
                 </form>
             </div>
@@ -341,68 +295,59 @@ const AddTransactionModal = ({ isOpen, onClose, onAddTransaction, onUpdateTransa
     );
 };
 
-const CategoryChart = ({ data, onCategoryClick }) => {
-    const chartRef = useRef(null);
-    const chartInstance = useRef(null);
-  
+const CategoryChart = ({ data, onCategoryClick }: { data: Transaction[], onCategoryClick: (category: string) => void }) => {
+    const chartRef = useRef<HTMLCanvasElement>(null);
+    const chartInstanceRef = useRef<any>(null);
+
     useEffect(() => {
         if (!chartRef.current || !data) return;
-
-        const ctx = chartRef.current.getContext('2d');
-        if (chartInstance.current) {
-            chartInstance.current.destroy();
-        }
 
         const spendingByCategory = data
             .filter(t => t.type === 'expense')
             .reduce((acc, t) => {
                 acc[t.category] = (acc[t.category] || 0) + t.amount;
                 return acc;
-            }, {});
+            }, {} as Record<string, number>);
 
         const labels = Object.keys(spendingByCategory);
-        const values = Object.values(spendingByCategory);
+        const chartData = Object.values(spendingByCategory);
 
-        const chartColors = [
-            '#4A90E2', '#50E3C2', '#F5A623', '#F8E71C', '#BD10E0', 
-            '#9013FE', '#B8E986', '#7ED321', '#E84A5F', '#FF847C'
-        ];
+        const colors = ['#4A90E2', '#50E3C2', '#E84A5F', '#F5A623', '#BD10E0', '#B8E986', '#7B68EE'];
+        
+        if (chartInstanceRef.current) {
+            chartInstanceRef.current.destroy();
+        }
 
-        chartInstance.current = new (window as any).Chart(ctx, {
+        const ctx = chartRef.current.getContext('2d');
+        if (!ctx) return;
+        
+        chartInstanceRef.current = new (window as any).Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: labels,
                 datasets: [{
-                    data: values,
-                    backgroundColor: chartColors,
-                    borderColor: '#1e1e2f',
-                    borderWidth: 2,
+                    data: chartData,
+                    backgroundColor: labels.map((_, i) => colors[i % colors.length]),
+                    borderColor: 'var(--surface-color)',
+                    borderWidth: 3,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 cutout: '70%',
-                onClick: (evt, elements) => {
-                    if (elements.length > 0) {
-                        const clickedElementIndex = elements[0].index;
-                        const label = chartInstance.current.data.labels[clickedElementIndex];
-                        if (label && onCategoryClick) {
-                            onCategoryClick(label);
-                        }
-                    }
-                },
                 plugins: {
                     legend: {
                         position: 'right',
                         labels: {
-                            color: '#a9a9c5',
-                            font: { size: 12 }
+                            color: 'var(--text-muted)',
+                            boxWidth: 20,
+                            padding: 20,
                         }
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function(context: any) {
                                 let label = context.label || '';
                                 if (label) {
                                     label += ': ';
@@ -414,17 +359,25 @@ const CategoryChart = ({ data, onCategoryClick }) => {
                             }
                         }
                     }
+                },
+                onClick: (_, elements) => {
+                    if (elements.length > 0) {
+                        const clickedIndex = elements[0].index;
+                        const category = labels[clickedIndex];
+                        onCategoryClick(category);
+                    }
                 }
             }
         });
 
         return () => {
-            if (chartInstance.current) {
-                chartInstance.current.destroy();
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.destroy();
             }
         };
+
     }, [data, onCategoryClick]);
-  
+
     return (
         <div className="chart-container">
             <canvas ref={chartRef}></canvas>
@@ -432,51 +385,57 @@ const CategoryChart = ({ data, onCategoryClick }) => {
     );
 };
 
-const AnnualTrendChart = ({ data }) => {
-    const chartRef = useRef(null);
-    const chartInstance = useRef(null);
-  
+const AnnualTrendChart = ({ transactions }: { transactions: Transaction[] }) => {
+    const chartRef = useRef<HTMLCanvasElement>(null);
+    const chartInstanceRef = useRef<any>(null);
+
     useEffect(() => {
-        if (!chartRef.current || !data) return;
+        if (!chartRef.current || !transactions) return;
 
-        const ctx = chartRef.current.getContext('2d');
-        if (chartInstance.current) {
-            chartInstance.current.destroy();
-        }
+        const monthlyData = Array(12).fill(0).map(() => ({ revenue: 0, expense: 0 }));
 
-        const monthlyRevenues = Array(12).fill(0);
-        const monthlyExpenses = Array(12).fill(0);
-
-        data.forEach(t => {
+        transactions.forEach(t => {
             const month = new Date(t.date).getMonth();
             if (t.type === 'revenue') {
-                monthlyRevenues[month] += t.amount;
+                monthlyData[month].revenue += t.amount;
             } else {
-                monthlyExpenses[month] += t.amount;
+                monthlyData[month].expense += t.amount;
             }
         });
 
-        const monthLabels = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+        const labels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const revenueData = monthlyData.map(m => m.revenue);
+        const expenseData = monthlyData.map(m => m.expense);
 
-        chartInstance.current = new (window as any).Chart(ctx, {
+        if (chartInstanceRef.current) {
+            chartInstanceRef.current.destroy();
+        }
+        
+        const ctx = chartRef.current.getContext('2d');
+        if (!ctx) return;
+        
+        chartInstanceRef.current = new (window as any).Chart(ctx, {
             type: 'line',
             data: {
-                labels: monthLabels,
-                datasets: [{
-                    label: 'Receitas',
-                    data: monthlyRevenues,
-                    borderColor: '#50E3C2',
-                    backgroundColor: 'rgba(80, 227, 194, 0.2)',
-                    fill: true,
-                    tension: 0.3
-                },{
-                    label: 'Despesas',
-                    data: monthlyExpenses,
-                    borderColor: '#E84A5F',
-                    backgroundColor: 'rgba(232, 74, 95, 0.2)',
-                    fill: true,
-                    tension: 0.3
-                }]
+                labels,
+                datasets: [
+                    {
+                        label: 'Receitas',
+                        data: revenueData,
+                        borderColor: 'var(--green)',
+                        backgroundColor: 'rgba(80, 227, 194, 0.2)',
+                        fill: true,
+                        tension: 0.4,
+                    },
+                    {
+                        label: 'Despesas',
+                        data: expenseData,
+                        borderColor: 'var(--red)',
+                        backgroundColor: 'rgba(232, 74, 95, 0.2)',
+                        fill: true,
+                        tension: 0.4,
+                    }
+                ]
             },
             options: {
                 responsive: true,
@@ -484,131 +443,200 @@ const AnnualTrendChart = ({ data }) => {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        ticks: { color: '#a9a9c5' },
-                        grid: { color: 'rgba(169, 169, 197, 0.1)' }
+                        ticks: { color: 'var(--text-muted)' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
                     },
                     x: {
-                        ticks: { color: '#a9a9c5' },
-                        grid: { color: 'rgba(169, 169, 197, 0.1)' }
+                        ticks: { color: 'var(--text-muted)' },
+                        grid: { display: false }
                     }
                 },
                 plugins: {
-                    legend: {
-                        labels: { color: '#a9a9c5' }
-                    },
+                    legend: { labels: { color: 'var(--text-muted)' } },
                     tooltip: {
                         mode: 'index',
                         intersect: false,
                         callbacks: {
-                            label: (context) => `${context.dataset.label}: ${formatCurrency(context.parsed.y)}`
+                           label: (context) => `${context.dataset.label}: ${formatCurrency(context.parsed.y)}`
                         }
                     }
                 }
             }
         });
-
-        return () => {
-            if (chartInstance.current) {
-                chartInstance.current.destroy();
+        
+         return () => {
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.destroy();
             }
         };
-    }, [data]);
-  
+
+    }, [transactions]);
+    
     return (
-      <div className="annual-trend-chart-container">
-        <canvas ref={chartRef}></canvas>
-      </div>
-    );
-};
-
-
-const DashboardOverview = ({ transactions, annualTransactions, onCategorySelect, onEditTransaction, onDeleteTransaction }) => {
-    const totalRevenue = transactions.filter(t => t.type === 'revenue').reduce((sum, t) => sum + t.amount, 0);
-    const totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-    const balance = totalRevenue - totalExpense;
-    const recentTransactions = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
-
-    return (
-        <div className="dashboard-grid">
-            <div className="card summary-card balance">
-                <h3>Saldo Atual</h3>
-                <p>{formatCurrency(balance)}</p>
-            </div>
-            <div className="card summary-card revenue">
-                <h3>Receitas do Mês</h3>
-                <p>{formatCurrency(totalRevenue)}</p>
-            </div>
-            <div className="card summary-card expense">
-                <h3>Despesas do Mês</h3>
-                <p>{formatCurrency(totalExpense)}</p>
-            </div>
-            <div className="card card-full-width">
-                 <h3>Gastos por Categoria</h3>
-                 <CategoryChart data={transactions} onCategoryClick={onCategorySelect} />
-            </div>
-             <div className="card card-full-width">
-                 <h3>Tendência Anual</h3>
-                 <AnnualTrendChart data={annualTransactions} />
-            </div>
-            <div className="card card-full-width">
-                <h3>Transações Recentes</h3>
-                <ul className="transaction-list">
-                    {recentTransactions.map(t => (
-                        <li key={t.id} className={t.type}>
-                            <span>{t.description} <small>{t.category}</small></span>
-                            <div className="transaction-actions">
-                                <span className="transaction-amount">{formatCurrency(t.amount)}</span>
-                                <button onClick={() => onEditTransaction(t)} className="btn-edit">Editar</button>
-                                <button onClick={() => onDeleteTransaction(t.id)} className="btn-delete">Excluir</button>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            </div>
+        <div className="annual-trend-chart-container">
+            <canvas ref={chartRef}></canvas>
         </div>
     );
 };
 
-const TransactionListView = ({ transactions, onEdit, onDelete }) => {
+const MonthlyTrendChart = ({ transactions, selectedDate }: { transactions: Transaction[], selectedDate: { month: number, year: number } }) => {
+    const chartRef = useRef<HTMLCanvasElement>(null);
+    const chartInstanceRef = useRef<any>(null);
+
+    useEffect(() => {
+        if (!chartRef.current || !transactions) return;
+
+        const daysInMonth = new Date(selectedDate.year, selectedDate.month, 0).getDate();
+        const dailyData = Array.from({length: daysInMonth}, () => ({ revenue: 0, expense: 0 }));
+
+        transactions.forEach(t => {
+            const day = new Date(t.date).getDate() - 1;
+            if (t.type === 'revenue') {
+                dailyData[day].revenue += t.amount;
+            } else {
+                dailyData[day].expense += t.amount;
+            }
+        });
+
+        const labels = Array.from({length: daysInMonth}, (_, i) => String(i + 1));
+        const revenueData = dailyData.map(d => d.revenue);
+        const expenseData = dailyData.map(d => d.expense);
+        
+        if (chartInstanceRef.current) {
+            chartInstanceRef.current.destroy();
+        }
+
+        const ctx = chartRef.current.getContext('2d');
+        if (!ctx) return;
+
+        chartInstanceRef.current = new (window as any).Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Receitas',
+                        data: revenueData,
+                        borderColor: 'var(--green)',
+                        backgroundColor: 'rgba(80, 227, 194, 0.2)',
+                        fill: true,
+                        tension: 0.4,
+                    },
+                    {
+                        label: 'Despesas',
+                        data: expenseData,
+                        borderColor: 'var(--red)',
+                        backgroundColor: 'rgba(232, 74, 95, 0.2)',
+                        fill: true,
+                        tension: 0.4,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                 scales: {
+                    y: { beginAtZero: true, ticks: { color: 'var(--text-muted)' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+                    x: { ticks: { color: 'var(--text-muted)' }, grid: { display: false } }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            title: (tooltipItems: any[]) => {
+                                const day = tooltipItems[0].label;
+                                const monthName = new Date(selectedDate.year, selectedDate.month - 1, 1)
+                                                    .toLocaleString('pt-BR', { month: 'long' });
+                                const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+                                return `${day} de ${capitalizedMonth}`;
+                            },
+                            label: (context: any) => {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += formatCurrency(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+         return () => {
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.destroy();
+            }
+        };
+
+    }, [transactions, selectedDate]);
+
+    return (
+        <div className="monthly-trend-chart-container">
+            <canvas ref={chartRef}></canvas>
+        </div>
+    );
+};
+
+const TransactionListView = ({
+    title,
+    transactions,
+    onEdit,
+    onDelete,
+    isFullList = false,
+}: {
+    title: string;
+    transactions: Transaction[];
+    onEdit: (t: Transaction) => void;
+    onDelete: (id: string) => void;
+    isFullList?: boolean;
+}) => {
     const [currentPage, setCurrentPage] = useState(1);
     const transactionsPerPage = 10;
-
+    
     useEffect(() => {
         setCurrentPage(1);
     }, [transactions]);
-
+    
     const indexOfLastTransaction = currentPage * transactionsPerPage;
     const indexOfFirstTransaction = indexOfLastTransaction - transactionsPerPage;
     const currentTransactions = transactions.slice(indexOfFirstTransaction, indexOfLastTransaction);
+    
     const totalPages = Math.ceil(transactions.length / transactionsPerPage);
 
-    const handleNextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
-    const handlePrevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
-
     return (
-        <div className="card">
-            <ul className="transaction-list full-list">
-                {currentTransactions.length > 0 ? currentTransactions.map(t => (
-                    <li key={t.id} className={t.type}>
-                        <div>
-                            <span>{t.description}</span>
-                            <small>{new Date(t.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})} - {t.category}</small>
-                        </div>
-                        <div className="transaction-actions">
-                           <span className="transaction-amount">{formatCurrency(t.amount)}</span>
-                           <button onClick={() => onEdit(t)} className="btn-edit">Editar</button>
-                           <button onClick={() => onDelete(t.id)} className="btn-delete">Excluir</button>
-                        </div>
-                    </li>
-                )) : <p>Nenhuma transação encontrada para este período.</p>}
-            </ul>
-            {totalPages > 1 && (
-                <div className="pagination">
-                    <button onClick={handlePrevPage} disabled={currentPage === 1} className="btn btn-secondary">
+        <div className={`card ${isFullList ? 'card-full-width' : ''}`}>
+            <h3>{title}</h3>
+            {currentTransactions.length > 0 ? (
+                <ul className={`transaction-list ${isFullList ? 'full-list' : ''}`}>
+                    {currentTransactions.map(t => (
+                        <li key={t.id} className={t.type}>
+                            <div>
+                                <span>{t.description}
+                                <small>{t.category} • {formatDate(t.date)}</small>
+                                </span>
+                            </div>
+                            <div className="transaction-actions">
+                                <span className="transaction-amount">{formatCurrency(t.amount)}</span>
+                                <button className="btn-edit" onClick={() => onEdit(t)}>Editar</button>
+                                <button className="btn-delete" onClick={() => onDelete(t.id)}>Excluir</button>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            ) : <p>Nenhuma transação encontrada.</p>}
+            {isFullList && totalPages > 1 && (
+                 <div className="pagination">
+                    <button className="btn btn-secondary" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}>
                         Anterior
                     </button>
                     <span>Página {currentPage} de {totalPages}</span>
-                    <button onClick={handleNextPage} disabled={currentPage === totalPages} className="btn btn-secondary">
+                     <button className="btn btn-secondary" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages}>
                         Próximo
                     </button>
                 </div>
@@ -617,38 +645,33 @@ const TransactionListView = ({ transactions, onEdit, onDelete }) => {
     );
 };
 
-const CategoryManagerView = ({ categories, onAddCategory }) => {
-    const [newCategoryName, setNewCategoryName] = useState('');
-
-    const handleAdd = (e) => {
+const CategoryManager = ({ categories, onAddCategory }: { categories: Category[], onAddCategory: (name: string) => void }) => {
+    const [newCategory, setNewCategory] = useState('');
+    
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (newCategoryName.trim()) {
-            onAddCategory(newCategoryName.trim());
-            setNewCategoryName('');
+        if (newCategory.trim()) {
+            onAddCategory(newCategory.trim());
+            setNewCategory('');
         }
     };
-
+    
     return (
-        <div className="card">
+        <div className="card card-full-width">
             <h3>Gerenciar Categorias</h3>
-            <form onSubmit={handleAdd} className="category-form">
-                <input 
-                    type="text" 
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="Nova categoria"
-                />
+            <form onSubmit={handleSubmit} className="category-form">
+                <input type="text" value={newCategory} onChange={e => setNewCategory(e.target.value)} placeholder="Nova categoria" />
                 <button type="submit" className="btn btn-primary">Adicionar</button>
             </form>
             <ul className="category-list">
-                {categories.map(cat => <li key={cat.id}>{cat.name}</li>)}
+                {categories.map(c => <li key={c.id}>{c.name}</li>)}
             </ul>
         </div>
     );
 };
 
 const ProfileView = () => (
-    <div className="card">
+    <div className="card card-full-width">
         <h3>Meu Perfil</h3>
         <div className="form-group">
             <label>Email</label>
@@ -657,174 +680,301 @@ const ProfileView = () => (
     </div>
 );
 
-
-const DashboardPage = ({ onLogout }) => {
-    const [view, setView] = useState('dashboard');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [transactions, setTransactions] = useState(generateInitialTransactions());
-    const [categories, setCategories] = useState(initialCategories);
-    const [categoryFilter, setCategoryFilter] = useState(null);
-    const [editingTransaction, setEditingTransaction] = useState(null);
-
-    const [selectedDate, setSelectedDate] = useState({
-        month: new Date().getMonth(),
-        year: new Date().getFullYear(),
-    });
+const DashboardHeader = ({
+    title,
+    selectedDate,
+    onDateChange,
+}: {
+    title: string;
+    selectedDate: { month: number; year: number };
+    onDateChange: (type: 'month' | 'year', value: number) => void;
+}) => {
+    const [time, setTime] = useState(new Date());
 
     useEffect(() => {
-        setCategoryFilter(null);
-    }, [selectedDate]);
+        const timerId = setInterval(() => setTime(new Date()), 1000);
+        return () => clearInterval(timerId);
+    }, []);
 
-    const filteredTransactions = transactions.filter(t => {
-        const transactionDate = new Date(t.date);
-        return transactionDate.getMonth() === selectedDate.month && transactionDate.getFullYear() === selectedDate.year;
-    });
-    
+    const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
+
+    return (
+        <header className="dashboard-header">
+            <div className="header-left">
+                <h2>{title}</h2>
+                <div className="real-time-clock">{time.toLocaleTimeString('pt-BR')}</div>
+            </div>
+            <div className="header-center">
+                 <div className="date-filters">
+                    <select value={selectedDate.month} onChange={e => onDateChange('month', parseInt(e.target.value))}>
+                        {months.map((month, i) => <option key={i} value={i + 1}>{month}</option>)}
+                    </select>
+                    <select value={selectedDate.year} onChange={e => onDateChange('year', parseInt(e.target.value))}>
+                        {years.map(year => <option key={year} value={year}>{year}</option>)}
+                    </select>
+                </div>
+            </div>
+            <div className="header-right">
+            </div>
+        </header>
+    );
+};
+
+const Sidebar = ({
+    activeView,
+    onNavigate,
+    onLogout,
+    theme,
+    toggleTheme,
+} : {
+    activeView: string;
+    onNavigate: (view: string) => void;
+    onLogout: () => void;
+    theme: string;
+    toggleTheme: () => void;
+}) => {
+    return (
+        <aside className="sidebar">
+            <div className="logo" onClick={() => onNavigate('dashboard')}>FinTrack</div>
+            <nav className="sidebar-nav">
+                <a className={activeView === 'dashboard' ? 'active' : ''} onClick={() => onNavigate('dashboard')}>Dashboard</a>
+                <a className={activeView === 'revenues' ? 'active' : ''} onClick={() => onNavigate('revenues')}>Receitas</a>
+                <a className={activeView === 'expenses' ? 'active' : ''} onClick={() => onNavigate('expenses')}>Despesas</a>
+                <a className={activeView === 'categories' ? 'active' : ''} onClick={() => onNavigate('categories')}>Categorias</a>
+                <a className={activeView === 'profile' ? 'active' : ''} onClick={() => onNavigate('profile')}>Meu Perfil</a>
+            </nav>
+            <div className="theme-switcher-container">
+                <label className="theme-switcher">
+                    <input type="checkbox" checked={theme === 'dark'} onChange={toggleTheme} />
+                    <span className="slider"></span>
+                </label>
+            </div>
+            <button className="btn btn-secondary logout-btn" onClick={onLogout}>Sair</button>
+        </aside>
+    );
+};
+
+
+const DashboardOverview = ({
+    transactions,
+    filteredTransactions,
+    selectedDate,
+    onCategoryClick,
+    onEdit,
+    onDelete,
+} : {
+    transactions: Transaction[],
+    filteredTransactions: Transaction[],
+    selectedDate: {month: number, year: number},
+    onCategoryClick: (category: string) => void,
+    onEdit: (t: Transaction) => void,
+    onDelete: (id: string) => void,
+}) => {
+    const revenue = filteredTransactions.filter(t => t.type === 'revenue').reduce((sum, t) => sum + t.amount, 0);
+    const expense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const balance = revenue - expense;
+    const recentTransactions = [...filteredTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
     const annualTransactions = transactions.filter(t => new Date(t.date).getFullYear() === selectedDate.year);
 
+    return (
+        <div className="dashboard-grid">
+            <div className="card summary-card balance">
+                <h3>Saldo Atual</h3>
+                <p>{formatCurrency(balance)}</p>
+            </div>
+            <div className="card summary-card revenue">
+                <h3>Receitas</h3>
+                <p>{formatCurrency(revenue)}</p>
+            </div>
+            <div className="card summary-card expense">
+                <h3>Despesas</h3>
+                <p>{formatCurrency(expense)}</p>
+            </div>
+            
+            <TransactionListView title="Transações Recentes" transactions={recentTransactions} onEdit={onEdit} onDelete={onDelete} />
 
-    const handleAddTransaction = (newTransaction) => {
-        setTransactions(prev => [...prev, { ...newTransaction, id: Date.now() }]);
+            <div className="card card-full-width">
+                 <h3>Gastos por Categoria</h3>
+                 <CategoryChart data={filteredTransactions} onCategoryClick={onCategoryClick} />
+            </div>
+
+            <div className="card card-full-width">
+                <div className="trends-container">
+                    <div className="trend-chart-item">
+                        <h3>Tendência Mensal</h3>
+                        <MonthlyTrendChart transactions={filteredTransactions} selectedDate={selectedDate} />
+                    </div>
+                    <div className="trend-chart-item">
+                        <h3>Tendência Anual</h3>
+                        <AnnualTrendChart transactions={annualTransactions} />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const FilteredTransactionView = ({ transactions, category, onBack, onEdit, onDelete }: {
+    transactions: Transaction[];
+    category: string;
+    onBack: () => void;
+    onEdit: (t: Transaction) => void;
+    onDelete: (id: string) => void;
+}) => (
+    <div>
+        <button className="btn btn-secondary btn-back" onClick={onBack}>Voltar ao Dashboard</button>
+        <TransactionListView
+            title={`Despesas: ${category}`}
+            transactions={transactions}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            isFullList={true}
+        />
+    </div>
+);
+
+const DashboardPage = ({ onLogout, theme, toggleTheme }: { onLogout: () => void, theme: string, toggleTheme: () => void }) => {
+    const [view, setView] = useState('dashboard');
+    const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+    const [categories, setCategories] = useState<Category[]>(initialCategories);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+    const [selectedDate, setSelectedDate] = useState({
+        month: new Date().getMonth() + 1,
+        year: new Date().getFullYear(),
+    });
+    const [filteredCategory, setFilteredCategory] = useState<string | null>(null);
+
+    const handleDateChange = (type: 'month' | 'year', value: number) => {
+        setSelectedDate(prev => ({ ...prev, [type]: value }));
+        setFilteredCategory(null);
+    };
+
+    const handleAddTransaction = (transaction: Omit<Transaction, 'id'>) => {
+        setTransactions([...transactions, { ...transaction, id: `t${Date.now()}` }]);
     };
     
-    const handleUpdateTransaction = (updatedTransaction) => {
-        setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t));
+    const handleUpdateTransaction = (updatedTransaction: Transaction) => {
+        setTransactions(transactions.map(t => t.id === updatedTransaction.id ? updatedTransaction : t));
     };
 
-    const handleDeleteTransaction = (transactionId) => {
-        if (window.confirm('Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita.')) {
-            setTransactions(prev => prev.filter(t => t.id !== transactionId));
+    const handleDeleteTransaction = (id: string) => {
+        if(window.confirm('Tem certeza que deseja excluir esta transação?')) {
+            setTransactions(transactions.filter(t => t.id !== id));
         }
     };
-
-    const handleOpenEditModal = (transaction) => {
+    
+    const handleAddCategory = (name: string) => {
+        if (!categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+            setCategories([...categories, { name, id: `c${Date.now()}` }]);
+        }
+    };
+    
+    const openEditModal = (transaction: Transaction) => {
         setEditingTransaction(transaction);
         setIsModalOpen(true);
     };
-    
-    const handleCloseModal = () => {
-        setIsModalOpen(false);
+
+    const openAddModal = () => {
         setEditingTransaction(null);
+        setIsModalOpen(true);
     };
 
-    const handleAddCategory = (categoryName) => {
-        const newCategory = { id: categories.length + 1, name: categoryName };
-        setCategories(prev => [...prev, newCategory]);
-    };
+    const filteredTransactions = transactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return transactionDate.getMonth() + 1 === selectedDate.month &&
+               transactionDate.getFullYear() === selectedDate.year;
+    });
 
-    const viewTitles = {
-        dashboard: 'Dashboard',
-        revenues: 'Minhas Receitas',
-        expenses: 'Minhas Despesas',
-        categories: 'Categorias',
-        profile: 'Meu Perfil',
-    };
-
-    const title = view === 'dashboard' && categoryFilter ? `Despesas: ${categoryFilter}` : viewTitles[view];
-
-    const renderView = () => {
-        switch (view) {
-            case 'dashboard':
-                if (categoryFilter) {
-                    const categoryTransactions = filteredTransactions.filter(
-                        t => t.type === 'expense' && t.category === categoryFilter
-                    );
-                    return (
-                        <div className="filtered-transaction-view">
-                            <button onClick={() => setCategoryFilter(null)} className="btn btn-secondary btn-back">
-                                &larr; Voltar ao Dashboard
-                            </button>
-                            <TransactionListView transactions={categoryTransactions} onEdit={handleOpenEditModal} onDelete={handleDeleteTransaction}/>
-                        </div>
-                    );
-                }
-                return <DashboardOverview 
-                            transactions={filteredTransactions} 
-                            annualTransactions={annualTransactions} 
-                            onCategorySelect={setCategoryFilter} 
-                            onEditTransaction={handleOpenEditModal} 
-                            onDeleteTransaction={handleDeleteTransaction}
-                        />;
-            case 'revenues':
-                return <TransactionListView transactions={filteredTransactions.filter(t => t.type === 'revenue')} onEdit={handleOpenEditModal} onDelete={handleDeleteTransaction} />;
-            case 'expenses':
-                return <TransactionListView transactions={filteredTransactions.filter(t => t.type === 'expense')} onEdit={handleOpenEditModal} onDelete={handleDeleteTransaction} />;
-            case 'categories':
-                return <CategoryManagerView categories={categories} onAddCategory={handleAddCategory} />;
-             case 'profile':
-                return <ProfileView />;
-            default:
-                return <DashboardOverview 
-                            transactions={filteredTransactions} 
-                            annualTransactions={annualTransactions} 
-                            onCategorySelect={setCategoryFilter} 
-                            onEditTransaction={handleOpenEditModal}
-                            onDeleteTransaction={handleDeleteTransaction}
-                        />;
+    const getHeaderTitle = () => {
+        if (filteredCategory) return "Detalhes da Categoria";
+        switch(view) {
+            case 'dashboard': return 'Dashboard';
+            case 'revenues': return 'Minhas Receitas';
+            case 'expenses': return 'Minhas Despesas';
+            case 'categories': return 'Minhas Categorias';
+            case 'profile': return 'Meu Perfil';
+            default: return 'Dashboard';
         }
     };
 
+    const renderView = () => {
+        if (filteredCategory) {
+            const categoryTransactions = filteredTransactions.filter(t => t.category === filteredCategory && t.type === 'expense');
+            return <FilteredTransactionView
+                        transactions={categoryTransactions}
+                        category={filteredCategory}
+                        onBack={() => setFilteredCategory(null)}
+                        onEdit={openEditModal}
+                        onDelete={handleDeleteTransaction}
+                    />;
+        }
+
+        switch(view) {
+            case 'dashboard': return <DashboardOverview
+                                        transactions={transactions}
+                                        filteredTransactions={filteredTransactions}
+                                        selectedDate={selectedDate}
+                                        onCategoryClick={setFilteredCategory}
+                                        onEdit={openEditModal}
+                                        onDelete={handleDeleteTransaction}
+                                    />;
+            case 'revenues': return <TransactionListView title="Todas as Receitas" transactions={filteredTransactions.filter(t => t.type === 'revenue')} onEdit={openEditModal} onDelete={handleDeleteTransaction} isFullList />;
+            case 'expenses': return <TransactionListView title="Todas as Despesas" transactions={filteredTransactions.filter(t => t.type === 'expense')} onEdit={openEditModal} onDelete={handleDeleteTransaction} isFullList />;
+            case 'categories': return <CategoryManager categories={categories} onAddCategory={handleAddCategory} />;
+            case 'profile': return <ProfileView />;
+            default: return null;
+        }
+    }
+    
     return (
         <div className="dashboard-layout">
-            <Sidebar currentView={view} onNavigate={setView} onLogout={onLogout} />
+            <Sidebar activeView={view} onNavigate={setView} onLogout={onLogout} theme={theme} toggleTheme={toggleTheme} />
             <main className="dashboard-main">
-                 <DashboardHeader 
-                    title={title}
-                    selectedDate={selectedDate}
-                    onDateChange={setSelectedDate}
-                    onOpenModal={() => setIsModalOpen(true)}
-                />
-                <div className="dashboard-content">
-                    {renderView()}
-                </div>
+                <DashboardHeader title={getHeaderTitle()} selectedDate={selectedDate} onDateChange={handleDateChange} />
+                <button className="btn btn-primary" style={{alignSelf: 'flex-start', marginBottom: '2rem'}} onClick={openAddModal}>
+                    Adicionar Transação
+                </button>
+                {renderView()}
             </main>
-            <AddTransactionModal 
-                isOpen={isModalOpen} 
-                onClose={handleCloseModal} 
+            <AddTransactionModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
                 onAddTransaction={handleAddTransaction}
                 onUpdateTransaction={handleUpdateTransaction}
-                editingTransaction={editingTransaction}
                 categories={categories}
+                editingTransaction={editingTransaction}
             />
         </div>
     );
 };
 
-// --- COMPONENTE PRINCIPAL ---
 const App = () => {
-  const [page, setPage] = useState('landing'); // 'landing', 'login', 'signup', 'forgot', 'dashboard'
+    const [page, setPage] = useState('landing');
+    const [theme, setTheme] = useState('dark');
+    
+    useEffect(() => {
+        document.body.setAttribute('data-theme', theme);
+    }, [theme]);
+    
+    const toggleTheme = () => {
+        setTheme(prevTheme => prevTheme === 'dark' ? 'light' : 'dark');
+    };
 
-  const handleNavigate = (targetPage: string) => {
-    setPage(targetPage);
-  };
-
-  const handleAuthSuccess = () => {
-    setPage('dashboard');
-  };
-
-  const handleLogout = () => {
-    setPage('landing');
-  };
-
-  const renderPage = () => {
-    switch (page) {
-      case 'login':
-      case 'signup':
-      case 'forgot':
-        return <AuthForm mode={page} onNavigate={handleNavigate} onAuthSuccess={handleAuthSuccess} />;
-      case 'dashboard':
-        return <DashboardPage onLogout={handleLogout}/>;
-      case 'landing':
-      default:
-        return <LandingPage onNavigate={handleNavigate} />;
-    }
-  };
-
-  return <div className="app-container">{renderPage()}</div>;
+    const renderPage = () => {
+        switch (page) {
+            case 'landing': return <LandingPage onNavigate={setPage} />;
+            case 'login': return <AuthForm type="login" onNavigate={setPage} />;
+            case 'signup': return <AuthForm type="signup" onNavigate={setPage} />;
+            case 'forgot': return <AuthForm type="forgot" onNavigate={setPage} />;
+            case 'dashboard': return <DashboardPage onLogout={() => setPage('login')} theme={theme} toggleTheme={toggleTheme} />;
+            default: return <LandingPage onNavigate={setPage} />;
+        }
+    };
+    return <div className="app-container">{renderPage()}</div>;
 };
 
-const container = document.getElementById('root');
-if (container) {
-  const root = createRoot(container);
-  root.render(<App />);
-}
+const root = createRoot(document.getElementById('root') as HTMLElement);
+root.render(<React.StrictMode><App /></React.StrictMode>);
